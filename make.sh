@@ -1,4 +1,8 @@
 #!/bin/bash
+sudo apt install -y build-essential bc bison flex libelf-dev libssl-dev libncurses5-dev
+
+cd sct_debian
+
 cp /boot/config-$(uname -r) .config
 
 replace_string() {
