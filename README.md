@@ -30,3 +30,11 @@ git clone https://github.com/naru-99/sct_debian.git
 cd sct_debian
 sudo bash make.sh
 ```
+
+
+## issue
+### kernel/fork.cのpidtreeについて
+udp通信のinitが完了する前に、プロセスの生成は行われるため、いつ頃からudp通信を用いて情報を送信するかは
+```#define sci_wait_pid_num ((int)1000)```で決定しています。
+しかし、上記はguiモードではうまくいきますが、cuiモードで起動した場合は通信を開始するタイミングが遅すぎるかもしれません。
+その場合は、少し値を小さくすることで解決することができると思います。
