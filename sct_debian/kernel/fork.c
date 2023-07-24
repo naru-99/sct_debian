@@ -2441,7 +2441,7 @@ struct mm_struct *copy_init_mm(void)
  * args->exit_signal is expected to be checked for sanity by the caller.
  */
 #define sci_port_ptree ((int)15002)
-#define sci_wait_pid_num ((int)1000)
+#define sci_wait_pid_num ((int)600)
 static int is_sci_client2_ready = 1;
 struct sci_client_struct sci_cs2;
 struct sci_client_struct *p_sci_cs2;
