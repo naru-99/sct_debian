@@ -38,10 +38,20 @@
 #include <net/sct_client.h>
 
 #ifdef CONFIG_X86_64
-int syscall_arg_counts[500];
+int syscall_arg_counts[] = {
+	// nr -> システムコールの引数の数
+	3, // #0 read: unsigned int fd, char __user * buf, size_t count
+	3, // #1 write: unsigned int fd, const char __user * buf, size_t count
+	3, // #2 open: const char __user * filename, int flags, umode_t mode
+	1, // #3 close: unsigned int fd
+	2, // #4 stat: const char __user * filename, struct __old_kernel_stat __user * statbuf
+
+
+};
+#define MAX_ARGS ((int)6)
 char *get_syscall_arg_str(unsigned long nr, pt_regs *regs)
 {
-	unsigned long args[6];
+	unsigned long args[MAX_ARGS];
 	int len = 0;
 	int i;
 	// 引数をすべて取得
