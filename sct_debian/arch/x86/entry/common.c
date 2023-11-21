@@ -35,39 +35,71 @@
 #include <asm/syscall.h>
 #include <asm/irq_stack.h>
 
-#include <net/sci_client.h>
+#include <net/sct_client.h>
 
 #ifdef CONFIG_X86_64
-
-#define sci_port_syscall ((int)15001)
-static int is_sci_client_ready = 1;
-struct sci_client_struct sci_cs;
-struct sci_client_struct *p_sci_cs;
-
-void send_pid_scnum(int pid, unsigned long scnum)
+int syscall_arg_counts[500];
+char *get_syscall_arg_str(unsigned long nr, pt_regs *regs)
 {
-	char sendchar[PACKET_STR_SIZE];
-	int len;
-
-	len = snprintf(sendchar, PACKET_STR_SIZE, "%lu%c%d", scnum, SCI_SEPCHAR,
-		       pid);
-	sci_send(sendchar, len, p_sci_cs);
-}
-
-__visible noinstr void do_syscall_64(unsigned long nr, struct pt_regs *regs)
-{
-	nr = syscall_enter_from_user_mode(regs, nr);
-	if (is_sci_client_ready) {
-		p_sci_cs = &sci_cs;
-		init_sci_client(p_sci_cs, sci_port_syscall);
-		is_sci_client_ready = 0;
+	unsigned long args[6];
+	int len = 0;
+	int i;
+	// 引数をすべて取得
+	for (i = 0; i < 3; i++) {
+		args[i] = regs_get_kernel_argument(regs, i);
+		len += snprintf(NULL, 0, "%lx", args[i]);
+		if (i < 2) {
+			len++; // デリミタのためのスペース
+		}
 	}
 
+	//文字列に書き込む
+	char *syscall_arg_str = kmalloc(len + 1, GFP_KERNEL);
+	char *ptr = syscall_arg_str;
+	int written;
+	for (i = 0; i < 3; i++) {
+		written = snprintf(ptr, len + 1, "%lx", args[i]);
+		ptr += written;
+		len -= written;
+		if (i < 2) {
+			*ptr++ = SCT_DELIMITER;
+			len--;
+		}
+	}
+	*ptr = '\0';
+
+	switch (nr) {
+	case 0:
+		// syscall: read
+		// unsigned int fd, char __user * buf, size_t count
+		break;
+	case 1:
+		// syscall: write
+		break;
+	case 2:
+		// syscall: open
+		break;
+	default:
+		// 未定義のシステムコールの処理
+		return;
+	}
+}
+
+#define SYSCALL_PORT ((int)15001)
+static int is_client_ready = 1;
+struct sct_client_struct sct_cs, *p_sct_cs;
+__visible noinstr void do_syscall_64(unsigned long nr, struct pt_regs *regs)
+{
+	if (is_client_ready) {
+		p_sct_cs = &sct_cs;
+		init_sct_client(p_sct_cs, SYSCALL_PORT);
+		is_client_ready = 0;
+	}
+
+	nr = syscall_enter_from_user_mode(regs, nr);
 	instrumentation_begin();
 	if (likely(nr < NR_syscalls)) {
 		nr = array_index_nospec(nr, NR_syscalls);
-		send_pid_scnum((int)pid_nr(get_task_pid(current, PIDTYPE_PID)),
-			       nr);
 		regs->ax = sys_call_table[nr](regs);
 #ifdef CONFIG_X86_X32_ABI
 	} else if (x32_enabled &&
@@ -75,16 +107,11 @@ __visible noinstr void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 			  (nr & ~__X32_SYSCALL_BIT) < X32_NR_syscalls)) {
 		nr = array_index_nospec(nr & ~__X32_SYSCALL_BIT,
 					X32_NR_syscalls);
-		send_pid_scnum((int)pid_nr(get_task_pid(current, PIDTYPE_PID)),
-			       nr);
 		regs->ax = x32_sys_call_table[nr](regs);
 #endif
 	}
 	instrumentation_end();
 	syscall_exit_to_user_mode(regs);
-
-	// sci_col.ret = regs->ax;
-	//add_into_SCIQ(sci_col);
 }
 #endif
 
